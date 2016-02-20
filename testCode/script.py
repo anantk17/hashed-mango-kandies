@@ -1,13 +1,18 @@
-#import logging
-#logging.basicConfig(filename='sample.log',level=logging.CRITICAL)
-
 from libmproxy.script import concurrent
 from libmproxy.models import HTTPResponse
 from netlib.http import Headers
 import requests,re,urllib,copy,urlparse
 from pybloomfilter import BloomFilter
-bloom_Filter = BloomFilter(10000000, 0.01, 'blacklist')
-db_list = []
+from model import *
+
+
+database.connect()
+database.create_tables([Blacklist],safe=True)
+
+try:
+    bloom_Filter = BloomFilter.open('blacklist')
+except OSError: 
+    bloom_Filter = BloomFilter(10000000, 0.01, 'blacklist')
 
 ref_url = "athena.nitc.ac.in/anant_b120519cs/refURL"
 refPrime = "123456"
@@ -15,6 +20,35 @@ url_regex = r"(((https?:\/\/)?(www\.)?)?([-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,
 matcher = re.compile(url_regex)
 
 block_html = "<html><head><title>PAGE BLOCKED</title></head><body>Suspected Proxy Usage</body></html>"
+
+def in_blacklist(suspect_url):
+    """
+        Given a url, returns whether it is present in the blacklist
+    """
+    return Blacklist.select(Blacklist.url).where(Blacklist.url << [suspect_url]).count() > 0
+
+def strip_query_params_from_url(url):
+    """
+        Given a URL, remove GET request query params and return the 
+        remaining URL string
+    """
+    return urlparse.urlunparse(urlparse.urlparse(url)._replace(query=""))
+
+def add_to_blacklist_db(url):
+    """
+        Given a URL, adds it to the blacklist database 
+    """ 
+    Blacklist.insert(url = url).execute()
+
+
+def block_request(flow):
+    """
+        Modifies flow and blocks request for suspected proxy usage
+    """
+    resp = HTTPResponse("HTTP/1.1",200,"OK",
+                        Headers(Context_Type="text/html"),
+                        block_html)
+    flow.reply(resp)
 
 def url_in_query(query):
     """
@@ -73,12 +107,12 @@ def get_all_cookies(flow):
         
 def request(context,flow):
     current_url = flow.request.url
-    if(urlparse.urlunparse(urlparse.urlparse(current_url)._replace(query="")) in bloom_Filter):
-        context.log(urlparse.urlunparse(urlparse.urlparse(current_url)._replace(query="")))
-        resp = HTTPResponse("HTTP/1.1",200,"OK",
-                            Headers(Context_Type="text/html"),
-                            block_html)
-        flow.reply(resp)
+    base_url = strip_query_params_from_url(current_url) 
+    
+    if base_url in bloom_Filter and in_blacklist(base_url):
+        context.log(base_url)
+        block_request(flow)
+
     else:
         if flow.request.method == 'GET':
             q = flow.request.get_query()
@@ -90,10 +124,7 @@ def request(context,flow):
                 query = copy.deepcopy(q)
                 query[key] = [ref_url]
                 locate_url = flow.request.headers.get("Location","")
-                #context.log(flow.request.url)
-                current_url = flow.request.url
-                target_url = urlparse.urlunparse(urlparse.urlparse(current_url)._replace(query=""))
-
+                target_url = base_url
                 try:
                     r = requests.get(target_url,params=query,
                         cookies=cookies)
@@ -105,14 +136,11 @@ def request(context,flow):
                 primeFound = r.text.find(refPrime)
 
                 if(primeFound):
-                    #context.log("Prime Found")
-                    #add_to_blacklist(flow.request.pretty_host)
-                    resp = HTTPResponse("HTTP/1.1",200,"OK",
-                            Headers(Context_Type="text/html"),
-                            block_html)
+                    context.log("Prime Found")
                     bloom_Filter.add(target_url)
-                    db_list.append(target_url)
-                    flow.reply(resp)
+                    add_to_blacklist_db(target_url)
+                    block_request(flow)
+
                 else:
                     pass
 
@@ -133,14 +161,7 @@ def request(context,flow):
                     context.replay_request(f)
                     
                     locate_url = f.response.headers.get("Location","")
-                    new_locate_url = urlparse.urlunparse(urlparse.urlparse(locate_url)._replace(query=""))
-                    #logging.critical(locate_url)
-                    #context.log(f.request.headers.get_all("cookie"))
-                    #cookies = get_all_cookies(f)
-                    #logging.critical(f.request.headers.get_all("cookie"))
-                    #r = requests.get(locate_url,cookies=cookies)
-                    #logging.critical(f.response.headers.get_all("set-cookie"))
-                    #primeFound = r.text.find(refPrime)
+                    new_locate_url = strip_query_params_from_url(locate_url)
                     cookies = get_all_cookies(f)
                     try:
                         r = requests.get(locate_url,cookies=cookies)
@@ -152,15 +173,13 @@ def request(context,flow):
                     primeFound = r.text.find(refPrime)
                     if(primeFound):
                         context.log("Prime Found")
-                        #add_to_blacklist(flow.request.pretty_host)
-                        resp = HTTPResponse("HTTP/1.1",200,"OK",
-                                Headers(Context_Type="text/html"),
-                                block_html)
-                        bloom_Filter.add(flow.request.url)
+                        bloom_Filter.add(base_url)
+                        add_to_blacklist_db(base_url)
                         bloom_Filter.add(new_locate_url)
-                        db_list.append(flow.request.url)
-                        db_list.append(new_locate_url)
-                        flow.reply(resp)
+                        add_to_blacklist_db(new_locate_url)
+                        #context.log(db_list)
+                        block_request(flow)
+
                 else:
                     pass
 
