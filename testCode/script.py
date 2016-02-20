@@ -5,6 +5,9 @@ from libmproxy.script import concurrent
 from libmproxy.models import HTTPResponse
 from netlib.http import Headers
 import requests,re,urllib,copy,urlparse
+from pybloomfilter import BloomFilter
+bloom_Filter = BloomFilter(10000000, 0.01, 'blacklist')
+db_list = []
 
 ref_url = "athena.nitc.ac.in/anant_b120519cs/refURL"
 refPrime = "123456"
@@ -48,8 +51,9 @@ def parse_cookie_string(cookie_string, cookies):
     if len(cookie_string) > 0 :
         cookie_list = cookie_string[0].split(';')
         for cookie in cookie_list:
-            key,val = cookie.strip().split('=')
-            cookies[key] = val
+            if ( cookie.count('=') == 1):
+                key,val = cookie.strip().split('=')
+                cookies[key] = val
 
 def get_all_cookies(flow):
     """
@@ -68,85 +72,100 @@ def get_all_cookies(flow):
     return cookies
         
 def request(context,flow):
-    if flow.request.method == 'GET':
-        q = flow.request.get_query()
-        key = url_in_query(q)
-        if key:
-            #cookies = parse_cookies_from_request(flow.request)
-            cookies = {}
-            flow.intercept(context._master)
-            query = copy.deepcopy(q)
-            query[key] = [ref_url]
-            locate_url = flow.request.headers.get("Location","")
-            #context.log(flow.request.url)
-            current_url = flow.request.url
-            target_url = urlparse.urlunparse(urlparse.urlparse(current_url)._replace(query=""))
-
-            try:
-                r = requests.get(target_url,params=query,
-                    cookies=cookies)
-            except requests.exceptions.SSLError,requests.exceptions.MissingSchema:
-                flow.accept_intercept(context._master)
-                return 
-
-            #context.log(flow.request.url)
-            primeFound = r.text.find(refPrime)
-
-            if(primeFound):
-                #context.log("Prime Found")
-                #add_to_blacklist(flow.request.pretty_host)
-                resp = HTTPResponse("HTTP/1.1",200,"OK",
-                        Headers(Context_Type="text/html"),
-                        block_html)
-                flow.reply(resp)
-            else:
-                pass
-
-            flow.accept_intercept(context._master)
-    
-    elif flow.request.method == 'POST':
-        if "application/x-www-form-urlencoded" in flow.request.headers.get("content-type",""):
-            form = flow.request.get_form_urlencoded()
-            key = get_url_key(form)
-            #logging.debug(key)
-            if(key):
-                #logging.critical(key)
-                f = context.duplicate_flow(flow)
+    current_url = flow.request.url
+    if(urlparse.urlunparse(urlparse.urlparse(current_url)._replace(query="")) in bloom_Filter):
+        context.log(urlparse.urlunparse(urlparse.urlparse(current_url)._replace(query="")))
+        resp = HTTPResponse("HTTP/1.1",200,"OK",
+                            Headers(Context_Type="text/html"),
+                            block_html)
+        flow.reply(resp)
+    else:
+        if flow.request.method == 'GET':
+            q = flow.request.get_query()
+            key = url_in_query(q)
+            if key:
+                #cookies = parse_cookies_from_request(flow.request)
+                cookies = {}
                 flow.intercept(context._master)
-                form = f.request.get_form_urlencoded()
-                form[key] = [ref_url]
-                f.request.set_form_urlencoded(form)
-                context.replay_request(f)
-                
-                locate_url = f.response.headers.get("Location","")
-                #logging.critical(locate_url)
-                #context.log(f.request.headers.get_all("cookie"))
-                #cookies = get_all_cookies(f)
-                #logging.critical(f.request.headers.get_all("cookie"))
-                #r = requests.get(locate_url,cookies=cookies)
-                #logging.critical(f.response.headers.get_all("set-cookie"))
-                #primeFound = r.text.find(refPrime)
-                cookies = get_all_cookies(f)
+                query = copy.deepcopy(q)
+                query[key] = [ref_url]
+                locate_url = flow.request.headers.get("Location","")
+                #context.log(flow.request.url)
+                current_url = flow.request.url
+                target_url = urlparse.urlunparse(urlparse.urlparse(current_url)._replace(query=""))
+
                 try:
-                    r = requests.get(locate_url,cookies=cookies)
-                except requests.exceptions.MissingSchema as e:
+                    r = requests.get(target_url,params=query,
+                        cookies=cookies)
+                except requests.exceptions.SSLError,requests.exceptions.MissingSchema:
                     flow.accept_intercept(context._master)
                     return 
-                #logging.critical("Cookies follow")
-                #logging.critical(cookies)
+
+                #context.log(flow.request.url)
                 primeFound = r.text.find(refPrime)
+
                 if(primeFound):
-                    context.log("Prime Found")
+                    #context.log("Prime Found")
                     #add_to_blacklist(flow.request.pretty_host)
                     resp = HTTPResponse("HTTP/1.1",200,"OK",
                             Headers(Context_Type="text/html"),
                             block_html)
+                    bloom_Filter.add(target_url)
+                    db_list.append(target_url)
                     flow.reply(resp)
-            else:
-                pass
+                else:
+                    pass
 
-            flow.accept_intercept(context._master)
-
-
-        #raise NotImplementedError
+                flow.accept_intercept(context._master)
         
+        elif flow.request.method == 'POST':
+            if "application/x-www-form-urlencoded" in flow.request.headers.get("content-type",""):
+                form = flow.request.get_form_urlencoded()
+                key = get_url_key(form)
+                #logging.debug(key)
+                if(key):
+                    #logging.critical(key)
+                    f = context.duplicate_flow(flow)
+                    flow.intercept(context._master)
+                    form = f.request.get_form_urlencoded()
+                    form[key] = [ref_url]
+                    f.request.set_form_urlencoded(form)
+                    context.replay_request(f)
+                    
+                    locate_url = f.response.headers.get("Location","")
+                    new_locate_url = urlparse.urlunparse(urlparse.urlparse(locate_url)._replace(query=""))
+                    #logging.critical(locate_url)
+                    #context.log(f.request.headers.get_all("cookie"))
+                    #cookies = get_all_cookies(f)
+                    #logging.critical(f.request.headers.get_all("cookie"))
+                    #r = requests.get(locate_url,cookies=cookies)
+                    #logging.critical(f.response.headers.get_all("set-cookie"))
+                    #primeFound = r.text.find(refPrime)
+                    cookies = get_all_cookies(f)
+                    try:
+                        r = requests.get(locate_url,cookies=cookies)
+                    except requests.exceptions.MissingSchema as e:
+                        flow.accept_intercept(context._master)
+                        return 
+                    #logging.critical("Cookies follow")
+                    #logging.critical(cookies)
+                    primeFound = r.text.find(refPrime)
+                    if(primeFound):
+                        context.log("Prime Found")
+                        #add_to_blacklist(flow.request.pretty_host)
+                        resp = HTTPResponse("HTTP/1.1",200,"OK",
+                                Headers(Context_Type="text/html"),
+                                block_html)
+                        bloom_Filter.add(flow.request.url)
+                        bloom_Filter.add(new_locate_url)
+                        db_list.append(flow.request.url)
+                        db_list.append(new_locate_url)
+                        flow.reply(resp)
+                else:
+                    pass
+
+                flow.accept_intercept(context._master)
+
+
+            #raise NotImplementedError
+            
