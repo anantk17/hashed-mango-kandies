@@ -15,7 +15,7 @@ except OSError:
     bloom_Filter = BloomFilter(10000000, 0.01, 'blacklist')
 
 ref_url = "athena.nitc.ac.in/anant_b120519cs/refURL"
-refPrime = "123456"
+refPrime = "2074722246773485207821695222107608587480996474721117292752992589912196684750549658310084416732550077"
 url_regex = r"(((https?:\/\/)?(www\.)?)?([-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6})\b([-a-zA-Z0-9@:%_\+.~#?&//=]*))"
 matcher = re.compile(url_regex)
 
@@ -135,7 +135,7 @@ def request(context,flow):
                 #context.log(flow.request.url)
                 primeFound = r.text.find(refPrime)
 
-                if(primeFound):
+                if(primeFound >= 0):
                     context.log("Prime Found")
                     bloom_Filter.add(target_url)
                     add_to_blacklist_db(target_url)
@@ -171,7 +171,7 @@ def request(context,flow):
                     #logging.critical("Cookies follow")
                     #logging.critical(cookies)
                     primeFound = r.text.find(refPrime)
-                    if(primeFound):
+                    if(primeFound >= 0):
                         context.log("Prime Found")
                         bloom_Filter.add(base_url)
                         add_to_blacklist_db(base_url)
