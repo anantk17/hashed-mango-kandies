@@ -1,0 +1,4 @@
+version=0.6.0
+typesetter=pdflatex
+steps=texpdf
+root=/home/anant/Desktop/BTech Project/BTech Project/Docs/sem8-midterm-report/report.tex

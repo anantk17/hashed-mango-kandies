@@ -104,7 +104,8 @@ def get_all_cookies(flow):
         parse_cookie_string(c_string,cookies)
     
     return cookies
-        
+
+@concurrent
 def request(context,flow):
     current_url = flow.request.url
     base_url = strip_query_params_from_url(current_url) 
