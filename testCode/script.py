@@ -4,6 +4,11 @@ from netlib.http import Headers
 import requests,re,urllib,copy,urlparse
 from pybloomfilter import BloomFilter
 from model import *
+from selenium import webdriver
+from selenium.common.exceptions import WebDriverException
+
+
+browser = webdriver.PhantomJS()
 
 
 database.connect()
@@ -164,14 +169,27 @@ def request(context,flow):
                     locate_url = f.response.headers.get("Location","")
                     new_locate_url = strip_query_params_from_url(locate_url)
                     cookies = get_all_cookies(f)
-                    try:
-                        r = requests.get(locate_url,cookies=cookies)
-                    except requests.exceptions.MissingSchema as e:
-                        flow.accept_intercept(context._master)
-                        return 
+                        #r = requests.get(locate_url,cookies=cookies)
+                    parsed_url = urlparse.urlparse(new_locate_url)
+                    scheme = parsed_url[0]
+                    hostname = parsed_url[1]
+                    browser.get(scheme + "://" + hostname + "/" + refPrime)
+                    for key,value in cookies.items():
+                        try:
+                            c = {'name':key,'value':value}
+                            browser.add_cookie(c)
+                        except WebDriverException as e:
+                            continue
+                    
+                    browser.get(locate_url)
+                    source = browser.page_source
+                    with open('proxyPage.html','w') as outfile:
+                        outfile.write(source)
+
+                    primeFound = source.find(refPrime)
                     #logging.critical("Cookies follow")
                     #logging.critical(cookies)
-                    primeFound = r.text.find(refPrime)
+                    #primeFound = r.text.find(refPrime)
                     if(primeFound >= 0):
                         context.log("Prime Found")
                         bloom_Filter.add(base_url)
