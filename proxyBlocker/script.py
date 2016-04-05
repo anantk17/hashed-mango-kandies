@@ -183,9 +183,9 @@ def request(context,flow):
                     
                     browser.get(locate_url)
                     source = browser.page_source
-                    with open('proxyPage.html','w') as outfile:
-                        outfile.write(source)
-
+                    #with open('proxyPage.html','w') as outfile:
+                    #    outfile.write(source)
+                    #
                     primeFound = source.find(refPrime)
                     #logging.critical("Cookies follow")
                     #logging.critical(cookies)
