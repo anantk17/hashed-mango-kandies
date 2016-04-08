@@ -11,14 +11,17 @@ function extractDomain(url){
     return domain;
 }
 
-var SERVER_URL = "http://localhost:8088/";
+var SERVER_URL = "http://localhost:8080/";
 
 chrome.webRequest.onBeforeRequest.addListener(
         function(details){
             var bkg = chrome.extension.getBackgroundPage();
+            bkg.console.log(details.requestId);
             bkg.console.log('foo');
             url = details.url;
-            timestamp = details.timeStamp;
+            ///timeStamp = details.timeStamp;
+            timeStamp = (new Date()).getTime();
+            bkg.console.log(timeStamp);
             requestId = details.requestId;
             var domain = extractDomain(url);
             bkg.console.log(domain);
@@ -27,9 +30,10 @@ chrome.webRequest.onBeforeRequest.addListener(
                 var xhr = new XMLHttpRequest();
                 var data = new FormData();
                 data.append('domain',domain);
-                data.append('timestamp',timeStamp);
-                data.append('requestId',requestId);
-                xhr.open("POST",data,true);
+                //data.append('timestamp',timeStamp);
+                data.append('request_id',requestId);
+                data.append('send_time',timeStamp);
+                xhr.open("POST",SERVER_URL+'record/',true);
                 xhr.send(data);
             }
         },
@@ -37,23 +41,32 @@ chrome.webRequest.onBeforeRequest.addListener(
             types:["main_frame"]}
         );
 
-function toBlock(domain,timeStamp){
+function toBlock(requestId,rec_time){
     //SERVER_URL = "http://localhost:8088/";
     var xhr = new XMLHttpRequest();
-    xhr.open("GET",SERVER_URL + '?domain='+domain+'&time='+ timeStamp,false);
+    xhr.open("GET",SERVER_URL + 'query?request_id='+requestId+'&rec_time='+rec_time,false);
     xhr.send();
-    return xhr.responseText;
+    return parseInt(xhr.responseText);
 }
 
 chrome.webRequest.onHeadersReceived.addListener(
         function(details){
+            var bkg = chrome.extension.getBackgroundPage();
+            bkg.console.log(details.requestId);
             url = details.url;
-            timeStamp = details.timeStamp;
+            requestId = details.requestId;
+            //timeStamp = details.timeStamp;
+            timeStamp = (new Date()).getTime();
+            bkg.console.log(timeStamp);
+            ///bkg.console.log(details.statusCode);
+            statusCode = details.statusCode;
             var domain = extractDomain(url);
-            if(domain != 'localhost'){
-                if(toBlock(domain,timeStamp)){
+            if(domain != 'localhost' && statusCode== 200){
+                //bkg.console.log("Proxy Used" + toBlock(requestId,timeStamp));
+                bkg.console.log(statusCode);
+                if(toBlock(requestId,timeStamp)){
                     return {
-                    redirectUrl : "http://localhost:8088/blocked"
+                    redirectUrl : SERVER_URL+"block/"
                     };
                 }
             }    
