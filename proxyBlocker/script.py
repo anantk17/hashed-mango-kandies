@@ -36,7 +36,7 @@ def update_client(task_queue):
     def on_message(ws, message):
         data = json.loads(message)
         for url in data:
-            Blacklist.insert(url = url).execute()
+            Blacklist.create_or_get(url = url)
             bloom_Filter.add(url)
 
     def on_error(ws, error):
