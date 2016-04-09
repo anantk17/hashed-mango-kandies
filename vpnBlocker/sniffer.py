@@ -28,9 +28,9 @@ def sniffer(pkt):
     elif pkt.haslayer('IP'):
         ip = pkt['IP']
         #print ip.src
-    print pkt.time*1000.0
+    #print pkt.time*1000.0
 
 
 conf.sniff_promisc=False
-sniff(iface='ra0',prn=sniffer,store=0)
+sniff(iface='eth0',prn=sniffer,store=0)
 

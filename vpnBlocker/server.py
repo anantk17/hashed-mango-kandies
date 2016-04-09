@@ -58,7 +58,7 @@ def sniffer(ipStore,dnsCache):
             ip = pkt['IP']
             ipStore.insert(str(ip.src),pkt.time*1000.0)
 
-    sniff(iface='ra0',prn=on_sniff,store=0)
+    sniff(iface='eth0',prn=on_sniff,store=0)
         
 
 def checkIfSeen(domain_tuple,rec_time):
