@@ -10,18 +10,22 @@ connection_list = set()
 database.connect()
 database.create_tables([Blacklist],safe=True)
 
+l = []
 class EchoWebSocket(tornado.websocket.WebSocketHandler):
 
     def open(self):
     	connection_list.add(self)
     	url_list = [url.url for url in Blacklist.select()]
+        #url_list = l
     	self.write_message(json.dumps(url_list))
         print("WebSocket opened")
 
     def on_message(self, message):
     	message_list = json.loads(message)
+        print message_list
     	for message in message_list:
 	    	Blacklist.create_or_get(url = message)
+                #l.append(message)
     	for connection in connection_list:
     		if connection != self:
         		connection.write_message(json.dumps(message_list))

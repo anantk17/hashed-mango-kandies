@@ -32,7 +32,11 @@ matcher = re.compile(url_regex)
 block_html = "<html><head><title>PAGE BLOCKED</title></head><body>Suspected Proxy Usage</body></html>"
 
 def update_client(task_queue):
-
+    """
+    Collaborative blacklist update client
+    On connecting to the central server , updates will be recieved
+    On encountering new proxy site, update will be pushed to central server 
+    """
     def on_message(ws, message):
         data = json.loads(message)
         for url in data:
@@ -51,7 +55,7 @@ def update_client(task_queue):
                 next_task = task_queue.get()
                 time.sleep(2)
                 if next_task:
-                    ws.send(json.dumps([next_task]))
+                    ws.send(json.dumps(next_task))
                     task_queue.task_done()
 
         thread.start_new_thread(run, ())
@@ -65,15 +69,8 @@ def update_client(task_queue):
     ws.run_forever()
 
 tasks = multiprocessing.JoinableQueue()
-'''
-p = multiprocessing.Process(target = update_client, args=(tasks, ))
-p.daemon = True
-p.start()
-'''
-thread.start_new_thread(update_client, (tasks, ))
 
-def on_message(ws, message):
-    print(message)
+thread.start_new_thread(update_client, (tasks, ))
 
 def in_blacklist(suspect_url):
     """
@@ -194,7 +191,7 @@ def request(context,flow):
                     context.log("Prime Found")
                     bloom_Filter.add(target_url)
                     add_to_blacklist_db(target_url)
-                    tasks.put(target_url)
+                    tasks.put([target_url])
                     block_request(flow)
 
                 else:
@@ -246,8 +243,8 @@ def request(context,flow):
                         add_to_blacklist_db(base_url)
                         bloom_Filter.add(new_locate_url)
                         add_to_blacklist_db(new_locate_url)
-                        tasks.put(base_url)
-                        tasks.put(new_locate_url)
+                        tasks.put([base_url,new_locate_url])
+                        #tasks.put(new_locate_url)
                         #context.log(db_list)
                         block_request(flow)
 
