@@ -1,0 +1,59 @@
+\documentclass[12pt,a4paper]{report}
+\usepackage[top=1.2in, bottom=1in, left= 1 in, right=0.5 in]{geometry}
+\usepackage{graphicx}
+\begin{document}
+\title{YOUR PROJECT TITLE }
+\thispagestyle{empty}
+\begin{center}
+\textbf{{\large YOUR PROJECT TITLE}}\\
+\ \\
+\textbf{A THESIS} \\
+\ \\
+\emph{submitted by} \\
+\ \\
+\uppercase{\textbf{Name1 \hspace{0.25 in} Roll Number1}}\\
+\ \\\uppercase{\textbf{Name2 \hspace{0.25 in}  Roll Number2}}\\
+\ \\in partial fulfilment for the award of the degree of \\
+\ \\ \textbf{Bachelor of Technology} \\ in \\ \textbf{Computer Science and Engineering}\\
+\ \\under the guidance of \\ 
+\ \\
+\textbf{{\uppercase{NAME OF GUIDE}}}\\
+\vspace*{1 in}
+\begin{center}
+\includegraphics[scale=1]{nitclogo.pdf}
+\end{center}
+
+\textbf{{\large DEPARTMENT OF COMPUTER SCIENCE AND ENGINEERING}}
+
+\textbf{{\large NATIONAL INSTITUTE OF TECHNOLOGY CALICUT}}
+
+\textbf{{\large NIT CAMPUS P.O, CALICUT\\KERALA, INDIA 673601}}
+
+{\today}\\
+\end{center}
+\pagenumbering{roman}
+\begin{abstract}
+An abstract of the work done (one paragraph)
+\end{abstract}
+\tableofcontents
+\listoffigures
+\listoftables
+
+\newpage
+\pagenumbering{arabic} 
+
+
+\include{introduction}
+\include{design}
+\include{implementation}
+\include{results}
+\include{conclusions}
+
+\begin{thebibliography}{}
+\bibitem{much}
+Steven Muchnik. \textit{Advanced Compiler Implementation}, Morgan Kauffman Publishers, 1997.
+\bibitem{sumit}
+Sumit Gulwani and George C Necula. A polynomial time Algorithm for Global Value Numbering, \textit{Science of Computer Programming}, 64(1):97-114, January 2007.
+\end{thebibliography}{}
+\end{document}
+
